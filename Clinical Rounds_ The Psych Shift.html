@@ -1,0 +1,624 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Clinical Rounds: The Psych Shift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a night-unit workstation — census board on the left, the open chart on the right; vitals read like a bedside monitor. Committed single dark look. */
+:root{
+  --night:#0e1522; --panel:#162033; --panel-2:#1c2840; --line:#2b3b58;
+  --text:#e6ecf5; --muted:#97a6bf; --lamp:#f0b450; --lamp-ink:#1d1606;
+  --ok:#57d19c; --warn:#ff9f5a; --crit:#ff6b6b;
+  --hr:#5fe08c; --spo2:#5cc8ff; --bp:#ff8a8a; --rr:#f5d76e; --temp:#c9a4ff;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--text)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.55;padding-inline:16px;padding-block:0 40px}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--night);border-bottom:1px solid var(--line);
+  display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-block:14px;margin-inline:-16px;padding-inline:16px}
+.brand{display:flex;flex-direction:column;gap:0;min-width:0}
+.brand small{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:clamp(20px,3.2vw,28px);margin:0;line-height:1.1;text-wrap:balance}
+.brand h1 span{color:var(--lamp)}
+.hud{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
+.hud div{display:flex;flex-direction:column}
+.hud label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.hud b{font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums;font-weight:600}
+.hud .clock b{color:var(--lamp)}
+
+.wrap{display:grid;grid-template-columns:270px minmax(0,1fr);gap:20px;max-width:1180px;margin:20px auto 0}
+@media (max-width:820px){.wrap{grid-template-columns:minmax(0,1fr)}}
+
+/* Census */
+.census{display:flex;flex-direction:column;gap:8px;align-self:start;position:sticky;top:calc(env(safe-area-inset-top,0px) + 86px)}
+.census h2{font-family:var(--f-display);font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;font-weight:500}
+.census p.hint{margin:0 0 6px;color:var(--muted);font-size:13px}
+.rooms{display:flex;flex-direction:column;gap:6px}
+@media (max-width:820px){
+  .census{position:static}
+  .rooms{flex-direction:row;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}
+  .room{min-width:190px;scroll-snap-align:start}
+}
+.room{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;
+  background:transparent;border:1px solid var(--line);border-radius:var(--r);padding:9px 10px;cursor:pointer}
+.room:hover{background:var(--panel)}
+.room[aria-current="true"]{background:var(--panel-2);border-color:var(--lamp)}
+.room .num{font-family:var(--f-mono);font-weight:600;color:var(--lamp);font-size:13px}
+.room .who{min-width:0}
+.room .who b{display:block;font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.room .who span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--muted)}
+.dot.prog{border-color:var(--lamp);background:transparent;box-shadow:inset 0 0 0 2px var(--night),inset 0 0 0 6px var(--lamp)}
+.dot.s3{background:var(--ok);border-color:var(--ok)}
+.dot.s2{background:var(--lamp);border-color:var(--lamp)}
+.dot.s1,.dot.s0{background:var(--crit);border-color:var(--crit)}
+.reportbtn{margin-top:8px;background:var(--lamp);color:var(--lamp-ink);border:0;border-radius:var(--r);padding:10px 12px;font-weight:600;cursor:pointer}
+.reportbtn:disabled{background:var(--panel-2);color:var(--muted);cursor:not-allowed}
+
+/* Chart */
+.chart{min-width:0;display:flex;flex-direction:column;gap:16px}
+.pt-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+.pt-head .rm{font-family:var(--f-mono);color:var(--lamp);font-size:14px;letter-spacing:.06em}
+.pt-head h2{font-family:var(--f-display);font-size:clamp(24px,3.6vw,34px);margin:0;line-height:1.1;font-weight:700;text-wrap:balance}
+.pt-head .dx{color:var(--muted);flex-basis:100%;font-size:15px}
+
+.monitor{background:#060a12;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 14px}
+@media (max-width:620px){.monitor{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.vital label{display:block;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;opacity:.85}
+.vital b{display:block;font-family:var(--f-mono);font-size:clamp(20px,3vw,28px);font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+.vital small{font-family:var(--f-mono);font-size:11px;opacity:.75}
+.v-hr{color:var(--hr)} .v-bp{color:var(--bp)} .v-spo2{color:var(--spo2)} .v-rr{color:var(--rr)} .v-t{color:var(--temp)}
+
+.grid2{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
+@media (max-width:700px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;min-width:0}
+.box h3{margin:0 0 8px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.sbar{display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 10px;margin:0}
+.sbar dt{font-family:var(--f-mono);font-weight:600;color:var(--lamp)}
+.sbar dd{margin:0 0 6px}
+.labs{width:100%;border-collapse:collapse;font-size:14px}
+.labs td{padding:4px 0;border-bottom:1px solid var(--line)}
+.labs td:last-child{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.labs tr.flag td:last-child{color:var(--warn);font-weight:600}
+.labs tr.flag td:last-child::after{content:" ▲"}
+.labs tr.flag.lo td:last-child::after{content:" ▼"}
+.meds{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.meds li{padding-left:14px;position:relative}
+.meds li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:1px;background:var(--muted)}
+
+/* Stability */
+.stab{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.stab .bar{flex:1 1 220px;height:12px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden}
+.stab .fill{height:100%;border-radius:6px;transition:width .6s ease,background-color .6s ease}
+.stab .lbl{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums;min-width:4ch}
+.pill{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.04em;padding:3px 10px;border-radius:999px;border:1px solid currentColor}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.crit{color:var(--crit)} .pill.mute{color:var(--muted)}
+
+/* Questions */
+.q{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.q .meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.q .tag{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--lamp);font-weight:600}
+.q .step{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.q .time{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-left:auto}
+.q p.stem{margin:0 0 12px;font-size:16px;max-width:68ch}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:grid;grid-template-columns:26px minmax(0,1fr);gap:10px;align-items:start;text-align:left;cursor:pointer;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.opt:hover:not(:disabled){border-color:var(--lamp)}
+.opt:disabled{cursor:default}
+.opt .k{font-family:var(--f-mono);font-weight:600;width:24px;height:24px;border-radius:6px;display:grid;place-items:center;border:1px solid var(--line);font-size:13px}
+.opt.right{border-color:var(--ok)} .opt.right .k{background:var(--ok);color:var(--night);border-color:var(--ok)}
+.opt.wrong{border-color:var(--crit)} .opt.wrong .k{background:var(--crit);color:var(--night);border-color:var(--crit)}
+.opt.dim{opacity:.55}
+.why{margin-top:12px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.why p{margin:0;max-width:72ch}
+.why .verdict{font-weight:600}
+.why .verdict.ok{color:var(--ok)} .why .verdict.bad{color:var(--crit)}
+.done-q{opacity:.82}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:500}
+.btn.primary{background:var(--lamp);color:var(--lamp-ink);border-color:var(--lamp);font-weight:600}
+.btn:hover{filter:brightness(1.08)}
+
+.outcome{display:flex;flex-direction:column;gap:6px;border-left:3px solid var(--line);padding:4px 0 4px 14px}
+.outcome.ok{border-color:var(--ok)} .outcome.warn{border-color:var(--warn)} .outcome.crit{border-color:var(--crit)}
+.outcome h3{margin:0;font-family:var(--f-display);font-size:20px}
+.outcome p{margin:0;color:var(--muted);max-width:70ch}
+
+/* Report */
+.report h2{font-family:var(--f-display);font-size:clamp(26px,4vw,36px);margin:0}
+.report .sub{color:var(--muted);margin:4px 0 0}
+.cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:620px){.cats{grid-template-columns:minmax(0,1fr)}}
+.cat b{font-family:var(--f-mono);font-size:28px;font-variant-numeric:tabular-nums;display:block}
+.cat span{color:var(--muted);font-size:13px}
+.tbl-wrap{overflow-x:auto}
+.rtbl{width:100%;border-collapse:collapse;font-size:14px;min-width:520px}
+.rtbl th{text-align:left;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+.rtbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.rtbl td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.review{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.field{display:flex;flex-direction:column;gap:4px;max-width:360px}
+.field label{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field input{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;color:var(--text);font:inherit}
+textarea.copytext{width:100%;min-height:180px;background:#060a12;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--f-mono);font-size:12.5px}
+.note{color:var(--muted);font-size:13px;max-width:75ch}
+.toast{font-size:13px;color:var(--ok)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="brand"><small>Behavioral Health 2 West · Night shift</small><h1>Clinical Rounds: <span>The Psych Shift</span></h1></div>
+  <div class="hud">
+    <div class="clock"><label>Unit clock</label><b id="clock">19:00</b></div>
+    <div><label>Patients seen</label><b id="seen">0/10</b></div>
+    <div><label>Score</label><b id="score">0/30</b></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="census" aria-label="Unit census">
+    <h2>Census</h2>
+    <p class="hint">Ten patients across acute psych, medical detox, eating disorders and geropsych. Three decisions each.</p>
+    <div class="rooms" id="rooms"></div>
+    <button class="reportbtn" id="reportBtn" disabled>End-of-shift report</button>
+    <button class="btn" id="resetBtn" style="margin-top:2px">Start a new shift</button>
+  </aside>
+  <main class="chart" id="chart" aria-live="polite"></main>
+</div>
+
+<script>
+const CASES = [
+{id:"201",unit:"Medical Detox",name:"Frank Delaney",age:52,sex:"M",dx:"Alcohol use disorder, acute withdrawal",
+ s:"Shaky and sweating; says he \"can't stop shaking and keeps seeing bugs on the wall.\"",
+ b:"Drinks about a fifth of vodka daily. Last drink 36 hours ago. Withdrawal seizure two years ago. Poor diet.",
+ a:"Coarse tremor, diaphoresis, anxious, picking at the sheets, visual disturbances, oriented ×3. CIWA-Ar score 18.",
+ r:"Symptom-triggered lorazepam per CIWA protocol. Dextrose-containing IV fluid and thiamine both ordered for tonight.",
+ mon:[["HR","118","sinus tach","hr"],["BP","168/98","mmHg","bp"],["CIWA","18","severe ≥ 15","spo2"],["RR","22","/min","rr"],["TEMP","37.9","°C","temp"]],
+ labs:[["Blood alcohol","0 mg/dL",""],["Magnesium","1.4 mg/dL","lo"],["Potassium","3.3 mEq/L","lo"],["AST / ALT","142 / 68 U/L","hi"],["Glucose","68 mg/dL","lo"]],
+ meds:["Lorazepam 2 mg IV per CIWA protocol","Thiamine 100 mg IV daily","Folic acid 1 mg daily, multivitamin","D5 0.45% NaCl with KCl","Magnesium sulfate IV replacement"],
+ qs:[
+  {cat:"Pathophysiology",topic:"Neurobiology of alcohol withdrawal",
+   stem:"Why does stopping alcohol cause tremor, hypertension and agitation?",
+   o:["Alcohol was stimulating his nervous system, and now it's crashing.",
+      "Chronic alcohol enhanced inhibitory GABA and suppressed excitatory glutamate; the brain adapted, so removing alcohol leaves it overexcited.",
+      "Low blood sugar alone causes all of these symptoms.",
+      "He's having an allergic reaction to the hospital food."],
+   c:1,why:"Alcohol enhances GABA-A activity and blocks NMDA glutamate receptors. With chronic use the brain down-regulates GABA receptors and up-regulates NMDA receptors. When alcohol stops, the unopposed excitation produces tremor, autonomic hyperactivity, seizures (usually 12 to 48 hours) and delirium tremens (usually 48 to 96 hours). Benzodiazepines work by acting on the same GABA-A receptors."},
+  {cat:"Pharmacology",topic:"Thiamine before glucose",
+   stem:"Thiamine and dextrose-containing fluids are both ordered. What is the correct sequence?",
+   o:["Dextrose first to correct his low glucose, thiamine tomorrow",
+      "Give thiamine before or with the dextrose, because glucose without thiamine can trigger Wernicke encephalopathy",
+      "The order doesn't matter.",
+      "Hold the thiamine until his glucose is normal."],
+   c:1,why:"Thiamine is a cofactor for glucose metabolism. In malnourished people with alcohol use disorder, a glucose load can use up the last thiamine stores and precipitate Wernicke encephalopathy (confusion, ataxia, ophthalmoplegia). Thiamine is given before or with glucose. Low magnesium also impairs thiamine use and lowers the seizure threshold, so it's replaced too."},
+  {cat:"Prioritization & Safety",topic:"Recognizing delirium tremens",
+   stem:"At 0300 (about 42 hours after his last drink) which change is most urgent?",
+   o:["He asks for more blankets.",
+      "He's newly disoriented and agitated, with a temperature of 38.8 °C, HR 136 and BP 184/104.",
+      "His tremor is the same as before.",
+      "He wants to call his sister."],
+   c:1,why:"Disorientation with fever, severe tachycardia and hypertension signals delirium tremens, a medical emergency with significant mortality. Notify the provider immediately, expect escalating benzodiazepines and possible ICU transfer, and keep him safe with seizure precautions. Visual hallucinations with a clear sensorium are alcoholic hallucinosis; DTs adds a clouded sensorium."}
+ ]},
+{id:"202",unit:"Acute Psych",name:"Jasmine Reyes",age:29,sex:"F",dx:"Bipolar I disorder, current episode manic",
+ s:"Hasn't slept in 4 nights; staff say she's been talking nonstop and won't sit to eat.",
+ b:"Stopped her valproate 6 weeks ago because she \"felt too flat.\" Spent $8,000 on a credit card last week.",
+ a:"Pressured speech, flight of ideas, grandiose (\"I'm launching a global fashion brand tonight\"), intrusive with peers, provocative clothing, pacing. Has eaten little in 2 days.",
+ r:"Valproate restarted. Valproate level and LFTs due in the morning.",
+ mon:[["HR","104","sinus tach","hr"],["BP","132/84","mmHg","bp"],["SpO₂","98%","room air","spo2"],["SLEEP","0","h last 3 nights","rr"],["WT","58","kg (−2 kg)","temp"]],
+ labs:[["Valproate level","< 10 mcg/mL","lo"],["Platelets","210 ×10³/µL",""],["ALT","24 U/L",""],["Pregnancy test","negative",""],["Ammonia","28 µmol/L",""]],
+ meds:["Divalproex 500 mg PO BID","Olanzapine 10 mg PO at bedtime","Lorazepam 1 mg PO PRN agitation"],
+ qs:[
+  {cat:"Prioritization & Safety",topic:"Meeting physical needs in acute mania",
+   stem:"Which intervention best meets her immediate physical needs?",
+   o:["Insist she sit at the table for a full meal.",
+      "Offer high-calorie finger foods and drinks she can take while moving, in a low-stimulation area, and encourage rest periods.",
+      "Allow her to skip meals until the mania settles.",
+      "Schedule group activities to use up her energy."],
+   c:1,why:"Manic patients often can't sit long enough to eat and burn huge amounts of energy, risking dehydration, exhaustion and malnutrition. Portable, nutrient-dense food and fluids meet needs without a power struggle. Reducing stimulation (a quieter space, fewer group activities) helps, because noise and activity escalate mania."},
+  {cat:"Pharmacology",topic:"Valproate monitoring and risks",
+   stem:"Which monitoring plan fits valproate?",
+   o:["Serum sodium and thyroid function only",
+      "Drug levels, liver function, platelets, and a pregnancy plan, with teaching about abdominal pain or easy bruising",
+      "No blood tests are needed.",
+      "Kidney function every week, because valproate is renally cleared"],
+   c:1,why:"Valproate can cause hepatotoxicity, pancreatitis, thrombocytopenia and hyperammonemia. A typical target trough is about 50 to 125 mcg/mL. It's highly teratogenic (neural tube defects), so people who could become pregnant need counseling and reliable contraception. Severe abdominal pain, vomiting, jaundice or unusual bruising should be reported."},
+  {cat:"Prioritization & Safety",topic:"Limit setting with manic behavior",
+   stem:"She keeps entering other patients' rooms and taking their belongings. What is the best approach?",
+   o:["Ignore it; she'll calm down eventually.",
+      "Set clear, consistent, nonpunitive limits, stated simply, and redirect her to a calmer activity; have all staff use the same approach.",
+      "Argue with her about why it's wrong until she agrees.",
+      "Place her in seclusion immediately."],
+   c:1,why:"Manic patients are easily distracted and may test boundaries or play staff against each other. Brief, firm and consistent limits from the whole team, without arguing, protect her and her peers. Seclusion is a last resort when there's imminent danger and less restrictive measures have failed."}
+ ]},
+{id:"203",unit:"Acute Psych",name:"David Kim",age:34,sex:"M",dx:"Treatment-resistant schizophrenia on clozapine",
+ s:"Says his throat is sore and he feels \"hot and achy.\"",
+ b:"Two antipsychotic trials failed. Clozapine started 8 weeks ago with a good response.",
+ a:"Throat red, swollen tonsils. Drooling at night, constipated for 4 days. Calm and organized.",
+ r:"Clozapine due at 2100. Weekly ANC drawn this afternoon.",
+ mon:[["HR","112","sinus tach","hr"],["BP","118/72","mmHg","bp"],["SpO₂","98%","room air","spo2"],["RR","18","/min","rr"],["TEMP","38.6","°C","temp"]],
+ labs:[["WBC","2.1 ×10³/µL","lo"],["ANC","800 /µL","lo"],["ANC (last week)","2,400 /µL",""],["Troponin","< 0.01 ng/mL",""]],
+ meds:["Clozapine 200 mg PO BID","Docusate and senna PO daily","Acetaminophen PRN"],
+ qs:[
+  {cat:"Pharmacology",topic:"Clozapine and neutropenia",
+   stem:"His ANC fell from 2,400 to 800 and he has a fever and sore throat. What do you do with the 2100 clozapine?",
+   o:["Give it; it's the only drug that has worked for him.",
+      "Hold it, notify the provider now, and expect infection workup and more frequent ANC checks.",
+      "Give it with an antibiotic.",
+      "Give half the dose and recheck the ANC next week."],
+   c:1,why:"Clozapine can cause severe neutropenia and agranulocytosis, most often in the first months. An ANC below 1,000 with fever and a sore throat means the drug should be interrupted and the provider notified immediately; infection can progress fast. ANC is monitored on a set schedule throughout treatment, with tighter checks after any drop."},
+  {cat:"Pathophysiology",topic:"Why neutropenia hides infection",
+   stem:"Why are fever and sore throat such important signs in a patient on clozapine?",
+   o:["They mean he's developing tolerance.",
+      "With few neutrophils, he can't mount a normal inflammatory response, so fever and mild local symptoms may be the only signs of a serious infection.",
+      "They're expected side effects of the drug that need no action.",
+      "They show that his psychosis is returning."],
+   c:1,why:"Neutrophils produce much of the redness, swelling and pus we use to spot infection. When they're depleted, an infection can be serious yet look mild. Teach every patient on clozapine to report fever, sore throat, flu-like symptoms or mouth sores right away."},
+  {cat:"Prioritization & Safety",topic:"Other serious clozapine adverse effects",
+   stem:"Besides neutropenia, which clozapine adverse effect can be fatal and is easy to overlook?",
+   o:["Weight gain",
+      "Severe constipation that can progress to bowel obstruction (gastrointestinal hypomotility)",
+      "Drooling at night",
+      "Mild sedation"],
+   c:1,why:"Clozapine's strong anticholinergic effects slow the gut, and hypomotility can progress to ileus, obstruction and bowel necrosis. Track bowel movements and give a bowel regimen. Myocarditis (usually in the first weeks), seizures and orthostasis are other serious risks. Drooling and weight gain are common but not usually dangerous."}
+ ]},
+{id:"204",unit:"Acute Psych",name:"Tyrell Washington",age:19,sex:"M",dx:"First-episode psychosis, started haloperidol today",
+ s:"Grabbing at his neck and saying he \"can't move my eyes.\"",
+ b:"Admitted yesterday with paranoid delusions. Received haloperidol 5 mg IM in the ED and 5 mg PO this afternoon.",
+ a:"Head twisted to the right, eyes fixed upward, jaw clenched, frightened. Speaking in short words. Breathing unlabored.",
+ r:"PRN benztropine and diphenhydramine ordered. AIMS baseline due this week.",
+ mon:[["HR","108","sinus tach","hr"],["BP","134/82","mmHg","bp"],["SpO₂","98%","room air","spo2"],["RR","20","/min","rr"],["TEMP","37.0","°C","temp"]],
+ labs:[["CK","220 U/L",""],["Urine drug screen","cannabis positive","hi"],["ECG QTc","448 ms",""]],
+ meds:["Haloperidol 5 mg PO BID","Benztropine 2 mg IM/IV PRN dystonia","Diphenhydramine 50 mg IM/IV PRN dystonia"],
+ qs:[
+  {cat:"Pathophysiology",topic:"Acute dystonia from dopamine blockade",
+   stem:"What is causing his sudden muscle spasms?",
+   o:["A seizure",
+      "Blocking dopamine in the nigrostriatal pathway leaves acetylcholine relatively unopposed, causing sustained muscle contractions (acute dystonia).",
+      "He's faking symptoms to avoid medication.",
+      "Low calcium"],
+   c:1,why:"Dopamine and acetylcholine balance each other in the basal ganglia. High-potency first-generation antipsychotics like haloperidol strongly block D2 receptors there, producing extrapyramidal symptoms. Acute dystonia (torticollis, oculogyric crisis, trismus) usually appears within hours to days and is most common in young males."},
+  {cat:"Pharmacology",topic:"Treating acute dystonia",
+   stem:"What is the priority treatment?",
+   o:["Give another dose of haloperidol to calm him.",
+      "Give IM or IV benztropine or diphenhydramine now, stay with him, and watch his airway.",
+      "Wait until morning for the provider.",
+      "Apply warm compresses to his neck only."],
+   c:1,why:"Anticholinergics restore the dopamine-acetylcholine balance and usually relieve dystonia within minutes when given IM or IV. Laryngeal dystonia can compromise the airway, so watch for stridor or trouble swallowing. The experience is frightening and can make patients refuse antipsychotics later, so reassurance and prompt treatment matter."},
+  {cat:"Prioritization & Safety",topic:"Tardive dyskinesia and AIMS monitoring",
+   stem:"His mother asks whether this could become permanent. Which explanation is accurate?",
+   o:["\"Acute dystonia is permanent.\"",
+      "\"This reaction is treatable and temporary. A different movement problem, tardive dyskinesia, can develop after long-term use and may be permanent, so we check for it regularly with a scale called the AIMS.\"",
+      "\"Antipsychotics never cause lasting movement problems.\"",
+      "\"Benztropine prevents every kind of movement side effect.\""],
+   c:1,why:"Acute dystonia resolves with treatment. Tardive dyskinesia (involuntary lip smacking, tongue movements, choreiform movements) develops after months to years of dopamine blockade and may be irreversible. The Abnormal Involuntary Movement Scale is done at baseline and regularly afterward. Anticholinergics don't treat TD and can worsen it."}
+ ]},
+{id:"205",unit:"Eating Disorders",name:"Claire Whitman",age:20,sex:"F",dx:"Anorexia nervosa, restrictive type; refeeding",
+ s:"Feels weak and short of breath on day 3 of her meal plan; ankles look swollen.",
+ b:"Admitted at BMI 14.2. Severe restriction for months. Nutrition started 3 days ago.",
+ a:"Lanugo, cold hands, ankle edema, mild crackles at the bases. Anxious about weight gain.",
+ r:"Morning labs just resulted. Meal plan scheduled to advance tomorrow.",
+ mon:[["HR","118","was 44 on admission","hr"],["BP","98/60","mmHg","bp"],["SpO₂","94%","room air","spo2"],["RR","24","/min","rr"],["BMI","14.6","kg/m²","temp"]],
+ labs:[["Phosphorus","1.4 mg/dL (was 3.6)","lo"],["Potassium","3.0 mEq/L","lo"],["Magnesium","1.5 mg/dL","lo"],["Glucose","132 mg/dL","hi"],["Albumin","3.0 g/dL","lo"]],
+ meds:["Meal plan per dietitian","Thiamine 100 mg daily","Potassium phosphate IV replacement (ordered)","Daily electrolytes, phosphorus and magnesium"],
+ qs:[
+  {cat:"Pathophysiology",topic:"Refeeding syndrome",
+   stem:"Why did her phosphorus drop so sharply after nutrition started?",
+   o:["She isn't eating her meals.",
+      "Carbohydrate intake raises insulin, which drives phosphate, potassium and magnesium into cells to make ATP; with depleted stores, serum levels crash.",
+      "Her kidneys are wasting phosphate because of dehydration.",
+      "It's lab error; phosphorus doesn't change with eating."],
+   c:1,why:"During starvation, total-body phosphate, potassium and magnesium are depleted even when serum levels look normal. Refeeding raises insulin, which shifts these into cells for glycolysis and ATP production. Hypophosphatemia can cause heart failure, arrhythmias, respiratory muscle weakness and seizures. Fluid retention adds to the risk of heart failure. It's most dangerous in the first week."},
+  {cat:"Prioritization & Safety",topic:"Responding to refeeding syndrome",
+   stem:"With phosphorus 1.4, edema, crackles and tachycardia, what is the priority?",
+   o:["Advance her calories tomorrow as planned.",
+      "Notify the provider now, expect electrolyte replacement and slowing of the feeding advance, and monitor her heart and breathing closely.",
+      "Stop all nutrition for a week.",
+      "Encourage extra fluids to treat the tachycardia."],
+   c:1,why:"These signs suggest refeeding syndrome with early fluid overload. Phosphate, potassium and magnesium are replaced and calories are advanced more slowly, not stopped, because she still needs nutrition. Cardiac monitoring, daily labs, strict intake and output and daily weights are standard in the first week."},
+  {cat:"Prioritization & Safety",topic:"Therapeutic approach in anorexia nervosa",
+   stem:"She says, \"I'll eat if you promise I won't gain more than a pound.\" What is the best response?",
+   o:["\"Okay, I promise.\"",
+      "\"I can't promise that. Your meal plan is designed to restore your health safely, and I'll sit with you during meals. What feels hardest about this meal?\"",
+      "\"If you don't eat, you'll get a feeding tube.\"",
+      "\"You're too thin; you need to gain a lot of weight.\""],
+   c:1,why:"Bargaining over weight is common, and agreeing reinforces the illness. Stay honest and consistent, keep the focus on health rather than numbers, offer support at meals, and explore her feelings. Threats and appearance comments increase shame and resistance."}
+ ]},
+{id:"206",unit:"Medical Detox",name:"Ashley Cooper",age:31,sex:"F",dx:"Opioid use disorder, buprenorphine induction",
+ s:"Wants to start \"the medicine that helps\" tonight; last used about 8 hours ago.",
+ b:"Uses illicit fentanyl daily for 3 years. Two prior overdoses. Wants long-term treatment.",
+ a:"Mild anxiety, slight yawning. Pupils normal size. No gooseflesh, no vomiting. COWS score 4.",
+ r:"Buprenorphine-naloxone ordered for induction when withdrawal is moderate. Naloxone kit to be given at discharge.",
+ mon:[["HR","88","sinus","hr"],["BP","124/78","mmHg","bp"],["COWS","4","mild","spo2"],["RR","16","/min","rr"],["TEMP","36.8","°C","temp"]],
+ labs:[["Urine drug screen","fentanyl positive","hi"],["Pregnancy test","negative",""],["Hepatitis C antibody","positive","hi"],["ALT","58 U/L","hi"]],
+ meds:["Buprenorphine-naloxone 2/0.5 mg to 4/1 mg SL when COWS ≥ 8–12","Clonidine 0.1 mg PO PRN withdrawal","Ondansetron PRN","Naloxone 4 mg nasal spray (discharge)"],
+ qs:[
+  {cat:"Pharmacology",topic:"Precipitated withdrawal with buprenorphine",
+   stem:"Why not give buprenorphine right now?",
+   o:["It's only safe in the morning.",
+      "Buprenorphine binds opioid receptors tightly but activates them only partly; given while fentanyl still occupies them, it displaces the fentanyl and causes sudden, severe precipitated withdrawal.",
+      "She needs to be in withdrawal for a week first.",
+      "It would cause an overdose."],
+   c:1,why:"Buprenorphine is a high-affinity partial mu agonist. If a full agonist is still bound, buprenorphine knocks it off and delivers less effect, triggering abrupt withdrawal. Induction waits until objective withdrawal is moderate (often COWS of about 8 to 12). Fentanyl's fat storage may mean a longer wait than with heroin."},
+  {cat:"Prioritization & Safety",topic:"Using the COWS score",
+   stem:"Which findings at 0200 would show she's ready for her first dose?",
+   o:["COWS of 4 and asking for the dose",
+      "COWS of 13: dilated pupils, gooseflesh, runny nose, restlessness and abdominal cramping",
+      "She's asleep.",
+      "She says she feels anxious."],
+   c:1,why:"The Clinical Opiate Withdrawal Scale scores objective signs such as pulse, sweating, pupil size, yawning, gooseflesh, GI upset and tremor. Moderate withdrawal means the opioid receptors are free enough for buprenorphine to relieve symptoms instead of precipitating withdrawal. Supportive PRN medications can ease the wait."},
+  {cat:"Pharmacology",topic:"Naloxone and overdose prevention teaching",
+   stem:"Which discharge teaching is most important for her safety?",
+   o:["\"Your tolerance is the same as before, so you can use your usual amount.\"",
+      "\"Your tolerance will be lower after treatment, so a return to use carries a high overdose risk. Keep naloxone with you, and make sure people around you know how to use it.\"",
+      "\"Naloxone is only for health professionals.\"",
+      "\"Buprenorphine makes overdose impossible.\""],
+   c:1,why:"After a period of reduced use, tolerance falls, and returning to a previous amount, especially with fentanyl, can be fatal. Naloxone reverses opioid overdose and should be carried by patients and their household. Buprenorphine lowers overdose risk but doesn't prevent it, particularly combined with benzodiazepines or alcohol."}
+ ]},
+{id:"207",unit:"Acute Psych",name:"Robert Ellis",age:58,sex:"M",dx:"Major depressive disorder on phenelzine (MAOI)",
+ s:"Sudden pounding headache at the back of his head and a stiff neck after dinner.",
+ b:"Depression not helped by SSRIs or SNRIs. Phenelzine started 3 weeks ago. Family brought aged cheese and salami this evening.",
+ a:"Flushed, diaphoretic, palpitations, anxious. No focal neurological deficits.",
+ r:"Phenelzine due at bedtime.",
+ mon:[["HR","124","sinus tach","hr"],["BP","214/122","mmHg","bp"],["SpO₂","97%","room air","spo2"],["RR","22","/min","rr"],["TEMP","37.6","°C","temp"]],
+ labs:[["Glucose","110 mg/dL",""],["Creatinine","1.0 mg/dL",""],["ECG","sinus tachycardia",""]],
+ meds:["Phenelzine 15 mg PO TID","Tyramine-restricted diet","Antihypertensive IV per provider (pending)"],
+ qs:[
+  {cat:"Pathophysiology",topic:"Tyramine and MAOI hypertensive crisis",
+   stem:"Why did eating aged cheese and salami cause this reaction?",
+   o:["He's allergic to dairy.",
+      "MAO normally breaks down dietary tyramine in the gut and liver; with MAO blocked, tyramine enters the circulation and triggers a large norepinephrine release.",
+      "The salt content raised his blood pressure.",
+      "Phenelzine lowers blood pressure, and the food reversed it."],
+   c:1,why:"Monoamine oxidase in the gut wall and liver usually inactivates tyramine from aged, fermented or cured foods. An MAOI blocks that, so tyramine reaches sympathetic nerve endings and displaces stored norepinephrine. The surge causes severe hypertension, occipital headache, stiff neck, palpitations and sweating, and can lead to stroke."},
+  {cat:"Prioritization & Safety",topic:"Responding to hypertensive crisis",
+   stem:"What is the priority?",
+   o:["Give the bedtime phenelzine and recheck BP in an hour.",
+      "Hold the phenelzine, notify the provider immediately, monitor BP and neuro status closely, and prepare for IV antihypertensive therapy.",
+      "Give acetaminophen for the headache and let him sleep.",
+      "Encourage him to walk to lower his BP."],
+   c:1,why:"A BP of 214/122 with symptoms is a hypertensive emergency. Hold the MAOI, call the provider, and monitor frequently for signs of stroke. A short-acting IV agent such as phentolamine or nicardipine may be ordered, and transfer to a higher level of care may be needed."},
+  {cat:"Pharmacology",topic:"MAOI diet and drug interactions",
+   stem:"Which statement shows he understands his MAOI safety teaching?",
+   o:["\"I can have aged cheese as long as I take my pill an hour later.\"",
+      "\"I'll avoid aged cheeses, cured meats, tap beer and soy sauce, and check with my prescriber before any cold medicine or new antidepressant.\"",
+      "\"I can switch to an SSRI tomorrow if I want.\"",
+      "\"The diet only matters for the first week.\""],
+   c:1,why:"Tyramine restriction continues throughout treatment and for about 2 weeks after stopping, while MAO regenerates. Decongestants and other sympathomimetics can also trigger a crisis. Combining an MAOI with SSRIs, SNRIs, tramadol or meperidine risks serotonin syndrome, so a washout of at least 2 weeks is required, longer after fluoxetine."}
+ ]},
+{id:"208",unit:"Acute Psych",name:"Malik Johnson",age:27,sex:"M",dx:"Schizophrenia, acute exacerbation with agitation",
+ s:"Shouting in the dayroom that \"they're putting poison in the food.\"",
+ b:"Admitted yesterday after stopping his medications. No history of violence on the unit. Responds well to his mother.",
+ a:"Pacing, clenched fists, loud voice, staring at a peer, says voices are telling him people are against him.",
+ r:"PRN haloperidol and lorazepam ordered. Unit restraint policy reviewed this morning.",
+ mon:[["HR","112","sinus tach","hr"],["BP","148/92","mmHg","bp"],["SpO₂","99%","room air","spo2"],["RR","22","/min","rr"],["TEMP","37.1","°C","temp"]],
+ labs:[["Urine drug screen","negative",""],["ECG QTc","436 ms",""],["Glucose","96 mg/dL",""]],
+ meds:["Olanzapine 10 mg PO daily","Haloperidol 5 mg PO/IM PRN severe agitation","Lorazepam 2 mg PO/IM PRN severe agitation"],
+ qs:[
+  {cat:"Prioritization & Safety",topic:"Early signs of escalation and verbal de-escalation",
+   stem:"What is your first approach?",
+   o:["Call security to restrain him right away.",
+      "Approach calmly with another staff member, keep a safe distance and a clear exit, speak in a low, simple voice, acknowledge his fear, and offer a quieter space and his PRN by mouth.",
+      "Tell him firmly that the voices aren't real.",
+      "Ignore him so you don't reinforce the behavior."],
+   c:1,why:"Pacing, clenched fists, a raised voice and staring are early warning signs. Verbal de-escalation is the first-line intervention: stay calm, keep space, use short sentences, acknowledge feelings rather than arguing with delusions, and offer choices. Oral medication offered voluntarily is preferred over IM. Removing the audience and the peer helps."},
+  {cat:"Pharmacology",topic:"Monitoring after IM antipsychotic and benzodiazepine",
+   stem:"He becomes assaultive, and IM haloperidol and lorazepam are given. What must you monitor afterward?",
+   o:["Only whether he falls asleep",
+      "Respiratory rate, oxygen saturation, level of sedation, blood pressure, extrapyramidal symptoms and, for haloperidol, cardiac rhythm and QTc",
+      "Blood glucose every hour",
+      "Nothing; IM medication is safer than oral."],
+   c:1,why:"The combination can cause respiratory depression and hypotension, especially with other sedatives. Haloperidol can prolong the QTc and cause acute dystonia. Monitor vital signs and sedation closely until he's alert, and have an anticholinergic available."},
+  {cat:"Prioritization & Safety",topic:"Restraint and seclusion standards",
+   stem:"If physical restraint becomes necessary, which practice is correct?",
+   o:["A standing PRN restraint order can be used any time.",
+      "Use it only as a last resort for imminent danger, with an order, a face-to-face evaluation within 1 hour, frequent checks of circulation, breathing, hydration and toileting, and release as soon as he's safe.",
+      "Keep him restrained until morning rounds.",
+      "Restrain him face down to keep staff safe."],
+   c:1,why:"Restraint is used only when less restrictive measures have failed and there's imminent risk of harm. Federal rules require a time-limited order (no PRN orders), a face-to-face evaluation within 1 hour, continuous observation, regular checks of circulation, skin, breathing, fluids and elimination, and release at the earliest safe moment. Prone restraint raises the risk of asphyxia. A debriefing follows."}
+ ]},
+{id:"209",unit:"Acute Psych",name:"Carlos Mendez",age:41,sex:"M",dx:"PTSD with nightmares; combat veteran",
+ s:"Woke screaming at 0200 and is now standing in a corner, breathing fast.",
+ b:"Two combat deployments. Admitted after a near-fight at a store. Prazosin started tonight for nightmares.",
+ a:"Hypervigilant, startles at noises, scanning the room. Says he \"was back there.\" Oriented once grounded.",
+ r:"Prazosin given at 2100 (first dose). He needs to use the bathroom.",
+ mon:[["HR","124","sinus tach","hr"],["BP","106/64","mmHg lying; 84/50 standing","bp"],["SpO₂","98%","room air","spo2"],["RR","26","/min","rr"],["TEMP","36.8","°C","temp"]],
+ labs:[["PCL-5 score","58","hi"],["Urine drug screen","negative",""],["Alcohol use (AUDIT-C)","5","hi"]],
+ meds:["Prazosin 1 mg PO at bedtime (first dose)","Sertraline 50 mg PO daily","Hydroxyzine 25 mg PO PRN anxiety"],
+ qs:[
+  {cat:"Pathophysiology",topic:"Hyperarousal in PTSD",
+   stem:"What underlies his nightmares, startle response and hypervigilance?",
+   o:["Low dopamine levels",
+      "An overactive fear circuit (amygdala) with excess noradrenergic activity and reduced regulation from the prefrontal cortex",
+      "Too much serotonin",
+      "Brain damage from alcohol"],
+   c:1,why:"In PTSD the amygdala responds strongly to reminders of trauma, the prefrontal cortex is less able to dampen it, and norepinephrine activity is elevated. The result is hyperarousal, exaggerated startle, intrusive memories and nightmares. Prazosin, an alpha-1 blocker, reduces this noradrenergic drive during sleep."},
+  {cat:"Pharmacology",topic:"First-dose orthostatic hypotension with prazosin",
+   stem:"He needs the bathroom after his first prazosin dose. His standing BP is 84/50. What do you do?",
+   o:["Let him walk on his own; he's young and fit.",
+      "Have him sit on the edge of the bed first, rise slowly, and walk with assistance; report the orthostatic drop.",
+      "Give another dose to help him sleep.",
+      "Tell him to wait until morning."],
+   c:1,why:"Prazosin causes vasodilation, and the first dose can produce marked orthostatic hypotension and fainting (\"first-dose effect\"). It's given at bedtime and started at a low dose. Teach him to change position slowly and to sit or lie down if dizzy. Assist with ambulation, especially at night."},
+  {cat:"Prioritization & Safety",topic:"Trauma-informed response to a nightmare",
+   stem:"How should you approach him right now?",
+   o:["Touch his shoulder firmly to snap him out of it.",
+      "Speak calmly from the doorway, say your name and where he is, give him space, and use grounding (\"feel your feet on the floor, tell me five things you can see\").",
+      "Turn on all the lights and call several staff into the room.",
+      "Leave him alone until he calms down."],
+   c:1,why:"Unexpected touch or a crowd can feel like a threat to someone in a trauma state. Trauma-informed care means a calm voice, giving your name, orienting him to the present, keeping a respectful distance, and offering choices. Grounding brings him back to the here and now. Afterward, check whether he feels safe and what helps him."}
+ ]},
+{id:"210",unit:"Geropsych",name:"Evelyn Hart",age:82,sex:"F",dx:"Major neurocognitive disorder (Alzheimer type) with new acute confusion",
+ s:"Daughter says she was \"herself\" yesterday but tonight doesn't know where she is and is pulling at her clothes.",
+ b:"Mild Alzheimer disease; usually pleasant and walks with a cane. Lives with her daughter. Uses hearing aids and glasses.",
+ a:"Attention wanders mid-sentence, drowsy then agitated, picking at the air. New urinary incontinence; urine cloudy and strong-smelling.",
+ r:"Night nurse asks about giving diphenhydramine for sleep. Urinalysis pending.",
+ mon:[["HR","102","sinus tach","hr"],["BP","108/64","mmHg","bp"],["SpO₂","95%","room air","spo2"],["RR","20","/min","rr"],["TEMP","37.8","°C","temp"]],
+ labs:[["Urinalysis","nitrites +, WBC 50/hpf","hi"],["Sodium","132 mEq/L","lo"],["BUN / creatinine","32 / 1.1 mg/dL","hi"],["Bladder scan","420 mL post-void","hi"],["CAM screen","positive","hi"]],
+ meds:["Donepezil 10 mg PO at bedtime","Antibiotic per urine culture (pending)","Diphenhydramine 25 mg PO PRN sleep (requested)"],
+ qs:[
+  {cat:"Pathophysiology",topic:"Delirium versus dementia",
+   stem:"How do you know this is delirium on top of her dementia, not dementia progressing?",
+   o:["Dementia always starts suddenly.",
+      "Delirium has an acute onset over hours to days, fluctuates, and impairs attention and alertness; dementia progresses slowly with attention usually preserved early on.",
+      "There's no way to tell them apart.",
+      "Delirium only happens in people without dementia."],
+   c:1,why:"Delirium is an acute brain dysfunction, often caused by infection, dehydration, drugs or urinary retention. Its hallmarks are sudden onset, a fluctuating course, inattention and altered level of consciousness. Dementia is gradual. People with dementia are at much higher risk of delirium, and it's often reversible when the cause is treated."},
+  {cat:"Pharmacology",topic:"Avoiding anticholinergics in older adults",
+   stem:"Should she get diphenhydramine for sleep?",
+   o:["Yes; it's a mild, safe sleep aid.",
+      "No; it's strongly anticholinergic, worsens confusion and urinary retention, and is on the Beers list of drugs to avoid in older adults. It also counteracts her donepezil.",
+      "Yes, but give a double dose since she's agitated.",
+      "Only if she's also given a benzodiazepine."],
+   c:1,why:"Anticholinergic drugs impair memory and attention, cause urinary retention, constipation and falls, and are a common cause of delirium in older adults. Donepezil works by increasing acetylcholine, so diphenhydramine works against it. Non-drug sleep measures come first."},
+  {cat:"Prioritization & Safety",topic:"Managing delirium: treat the cause",
+   stem:"What is the most important nursing priority tonight?",
+   o:["Apply restraints so she doesn't pull at her clothes.",
+      "Report the findings so the cause (UTI and urinary retention) is treated, and use non-drug measures: glasses and hearing aids on, reorientation, a familiar person present, hydration, a low light and a quiet room.",
+      "Turn the lights off completely and close the door.",
+      "Give an antipsychotic as the first step."],
+   c:1,why:"Finding and treating the underlying cause is central. Here that means the UTI and a full bladder of 420 mL, which may need catheterization. Sensory aids, reorientation, family presence, hydration, mobility and a normal sleep-wake cycle reduce delirium. Restraints and sedating drugs can worsen it and are used only when other measures fail."}
+ ]}
+];
+
+// Spread correct answers across A–D with a fixed, repeatable shuffle per question.
+CASES.forEach((c,ci)=>c.qs.forEach((q,qi)=>{
+  let a=(ci*97+qi*31+7)>>>0;const rnd=()=>{a=(a+0x6D2B79F5)>>>0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296};
+  const idx=[0,1,2,3];for(let i=3;i>0;i--){const j=Math.floor(rnd()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]]}
+  q.o=idx.map(i=>q.o[i]);q.c=idx.indexOf(q.c);
+}));
+
+const KEY="psych-shift-v1";
+const CATS=["Pathophysiology","Pharmacology","Prioritization & Safety"];
+let state={cur:0,ans:{},name:"",view:"case"};
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&s.ans)state=Object.assign(state,s)}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const answers=c=>state.ans[c.id]||[];
+const isDone=c=>answers(c).length===c.qs.length;
+const caseScore=c=>answers(c).reduce((n,a,i)=>n+(a===c.qs[i].c?1:0),0);
+function stability(c){let s=55;answers(c).forEach((a,i)=>{s+=a===c.qs[i].c?15:-15});return Math.max(10,Math.min(100,s))}
+function stabTone(s){return s>=85?"ok":s>=55?"warn":"crit"}
+function totals(){let seen=0,score=0,answered=0;CASES.forEach(c=>{if(isDone(c))seen++;score+=caseScore(c);answered+=answers(c).length});return{seen,score,answered}}
+function clockFor(n){const m=19*60+Math.round(n*72);const h=Math.floor(m/60)%24,mm=m%60;return String(h).padStart(2,"0")+":"+String(mm).padStart(2,"0")}
+
+function renderHud(){const t=totals();$("#clock").textContent=clockFor(t.answered/3);$("#seen").textContent=t.seen+"/10";$("#score").textContent=t.score+"/30";
+  $("#reportBtn").disabled=t.seen<CASES.length;}
+
+function renderRooms(){
+  $("#rooms").innerHTML=CASES.map((c,i)=>{
+    const a=answers(c);let cls="dot";if(isDone(c))cls+=" s"+caseScore(c);else if(a.length)cls+=" prog";
+    const st=isDone(c)?caseScore(c)+"/3":a.length?"in progress":"not seen";
+    return `<button class="room" data-i="${i}" aria-current="${state.view==="case"&&state.cur===i}" aria-label="Room ${c.id}, ${esc(c.name)}, ${st}">
+      <span class="num">${c.id}</span><span class="who"><b>${esc(c.name)}</b><span>${esc(c.unit)}</span></span><span class="${cls}" title="${st}"></span></button>`}).join("");
+  document.querySelectorAll(".room").forEach(b=>b.onclick=()=>{state.cur=+b.dataset.i;state.view="case";save();render();window.scrollTo({top:0,behavior:"smooth"})});
+}
+
+function renderCase(){
+  const c=CASES[state.cur],a=answers(c),s=stability(c),tone=stabTone(s);
+  const labs=c.labs.map(l=>`<tr class="${l[2]?"flag "+l[2]:""}"><td>${esc(l[0])}</td><td>${esc(l[1])}</td></tr>`).join("");
+  let qhtml="";
+  c.qs.forEach((q,qi)=>{
+    if(qi>a.length)return;
+    const chosen=a[qi],answered=chosen!==undefined;
+    const opts=q.o.map((t,oi)=>{let cls="opt";if(answered){if(oi===q.c)cls+=" right";else if(oi===chosen)cls+=" wrong";else cls+=" dim"}
+      return `<button class="${cls}" data-q="${qi}" data-o="${oi}" ${answered?"disabled":""}><span class="k">${"ABCD"[oi]}</span><span>${esc(t)}</span></button>`}).join("");
+    let why="";
+    if(answered){const ok=chosen===q.c;
+      why=`<div class="why"><p class="verdict ${ok?"ok":"bad"}">${ok?"Correct. Patient stability improves.":"Not the best choice. The correct answer is "+"ABCD"[q.c]+"."}</p><p>${esc(q.why)}</p></div>`}
+    qhtml+=`<section class="q ${answered?"done-q":""}" aria-label="Decision ${qi+1}">
+      <div class="meta"><span class="tag">${esc(q.cat)}</span><span class="step">Decision ${qi+1} of 3</span><span class="time">${clockFor(state.cur+qi/3)}</span></div>
+      <p class="stem">${esc(q.stem)}</p><div class="opts">${opts}</div>${why}</section>`;
+  });
+  let outcome="";
+  if(isDone(c)){
+    const sc=caseScore(c);
+    const txt=sc===3?["Stable at handoff","Your decisions kept "+c.name.split(" ")[0]+" safe through the night. Day shift receives a clean handoff."]:
+      sc===2?["Guarded","One decision slowed recovery, but the patient is safe at 0700. Review the rationale you missed."]:
+      ["Deteriorating","The rapid response team was called overnight. Review each rationale before your next shift."];
+    const t=sc===3?"ok":sc===2?"warn":"crit";
+    const next=CASES.findIndex((x,i)=>i>state.cur&&!isDone(x)),anyNext=next>=0?next:CASES.findIndex(x=>!isDone(x));
+    outcome=`<div class="outcome ${t}"><h3>${txt[0]} · ${sc}/3</h3><p>${txt[1]}</p></div>
+      <div class="actions">${anyNext>=0?`<button class="btn primary" id="nextBtn" data-n="${anyNext}">Go to Room ${CASES[anyNext].id}</button>`:`<button class="btn primary" id="toReport">See end-of-shift report</button>`}
+      <button class="btn" id="redoBtn">Redo this patient</button></div>`;
+  }
+  $("#chart").innerHTML=`
+   <div class="pt-head"><span class="rm">${esc(c.unit.toUpperCase())} · ROOM ${c.id}</span><h2>${esc(c.name)}, ${c.age} ${c.sex}</h2><span class="dx">${esc(c.dx)}</span></div>
+   <div class="monitor" role="group" aria-label="Bedside monitor">${c.mon.map(m=>`<div class="vital v-${m[3]==="temp"?"t":m[3]}"><label>${esc(m[0])}</label><b>${esc(m[1])}</b><small>${esc(m[2])}</small></div>`).join("")}
+   </div>
+   <div class="box stab"><h3 style="margin:0">Patient stability</h3><div class="bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${s}" aria-label="Patient stability"><div class="fill" style="width:${s}%;background:var(--${tone==="ok"?"ok":tone==="warn"?"lamp":"crit"})"></div></div><span class="lbl">${s}</span>
+     <span class="pill ${a.length?tone:"mute"}">${!a.length?"Awaiting assessment":tone==="ok"?"Improving":tone==="warn"?"Watch closely":"Declining"}</span></div>
+   <div class="grid2">
+     <div class="box"><h3>SBAR handoff from evening shift</h3><dl class="sbar">
+       <dt>S</dt><dd>${esc(c.s)}</dd><dt>B</dt><dd>${esc(c.b)}</dd><dt>A</dt><dd>${esc(c.a)}</dd><dt>R</dt><dd>${esc(c.r)}</dd></dl></div>
+     <div class="box"><h3>Labs &amp; results</h3><table class="labs">${labs}</table><h3 style="margin-top:14px">Active orders</h3><ul class="meds">${c.meds.map(m=>`<li>${esc(m)}</li>`).join("")}</ul></div>
+   </div>
+   ${qhtml}${outcome}`;
+  document.querySelectorAll(".opt:not(:disabled)").forEach(b=>b.onclick=()=>{
+    const qi=+b.dataset.q,oi=+b.dataset.o;const arr=state.ans[c.id]||(state.ans[c.id]=[]);if(arr.length!==qi)return;arr.push(oi);save();render();
+    const qs=document.querySelectorAll(".q");const last=isDone(c)?document.querySelector(".outcome"):qs[qs.length-1];if(last)last.scrollIntoView({behavior:"smooth",block:"center"})});
+  const nb=$("#nextBtn");if(nb)nb.onclick=()=>{state.cur=+nb.dataset.n;save();render();window.scrollTo({top:0,behavior:"smooth"})};
+  const tr=$("#toReport");if(tr)tr.onclick=()=>{state.view="report";save();render();window.scrollTo({top:0})};
+  const rd=$("#redoBtn");if(rd)rd.onclick=()=>{delete state.ans[c.id];save();render()};
+}
+
+function reportText(){
+  const t=totals();const lines=[];
+  lines.push("CLINICAL ROUNDS: THE PSYCH SHIFT — End-of-shift report");
+  lines.push("Student: "+(state.name||"(name not entered)"));
+  lines.push("Total: "+t.score+"/30 ("+Math.round(t.score/30*100)+"%)");
+  CATS.forEach(cat=>{let n=0,d=0;CASES.forEach(c=>c.qs.forEach((q,i)=>{if(q.cat===cat){d++;if(answers(c)[i]===q.c)n++}}));lines.push(cat+": "+n+"/"+d)});
+  lines.push("");
+  CASES.forEach(c=>lines.push("Room "+c.id+" "+c.name+" ("+c.dx+"): "+caseScore(c)+"/3"));
+  const miss=[];CASES.forEach(c=>c.qs.forEach((q,i)=>{if(answers(c)[i]!==q.c)miss.push("Rm "+c.id+": "+q.topic)}));
+  lines.push("");lines.push("Topics to review:");lines.push(miss.length?miss.map(m=>"- "+m).join("\n"):"- None. Full marks.");
+  return lines.join("\n");
+}
+
+function renderReport(){
+  const t=totals();const pct=Math.round(t.score/30*100);
+  const cats=CATS.map(cat=>{let n=0,d=0;CASES.forEach(c=>c.qs.forEach((q,i)=>{if(q.cat===cat){d++;if(answers(c)[i]===q.c)n++}}));
+    return `<div class="box cat"><h3>${esc(cat)}</h3><b>${n}/${d}</b><span>${Math.round(n/d*100)}% correct</span></div>`}).join("");
+  const rows=CASES.map(c=>{const sc=caseScore(c),tone=sc===3?"ok":sc===2?"warn":"crit",lab=sc===3?"Stable":sc===2?"Guarded":"Deteriorating";
+    return `<tr><td class="n">${c.id}</td><td>${esc(c.name)}</td><td>${esc(c.dx)}</td><td class="n">${sc}/3</td><td><span class="pill ${tone}">${lab}</span></td></tr>`}).join("");
+  const miss=[];CASES.forEach(c=>c.qs.forEach((q,i)=>{if(answers(c)[i]!==q.c)miss.push(`<li><b>Room ${c.id}:</b> ${esc(q.topic)}</li>`)}));
+  $("#chart").innerHTML=`<section class="report" style="display:flex;flex-direction:column;gap:16px">
+    <div><h2>End-of-shift report</h2><p class="sub">07:00 · ${t.score}/30 decisions correct (${pct}%)</p></div>
+    <div class="cats">${cats}</div>
+    <div class="box"><h3>Patients at handoff</h3><div class="tbl-wrap"><table class="rtbl"><thead><tr><th>Room</th><th>Patient</th><th>Diagnosis</th><th>Score</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div class="box"><h3>Topics to review</h3>${miss.length?`<ul class="review">${miss.join("")}</ul>`:"<p>None. Every decision was correct.</p>"}</div>
+    <div class="box" style="display:flex;flex-direction:column;gap:10px"><h3>Submit to Canvas</h3>
+      <div class="field"><label for="stuName">Your name</label><input id="stuName" value="${esc(state.name)}" autocomplete="name"></div>
+      <textarea class="copytext" id="repText" readonly aria-label="Report text">${esc(reportText())}</textarea>
+      <div class="actions"><button class="btn primary" id="copyBtn">Copy report</button><button class="btn" id="backBtn">Back to the unit</button><span class="toast" id="toast" aria-live="polite"></span></div>
+      <p class="note">Paste the copied report into the Canvas assignment or discussion your instructor set up.</p></div>
+    <p class="note">Educational simulation for BSN students. Rationales reflect common evidence-based practice; always follow current institutional protocols and provider orders.</p>
+  </section>`;
+  $("#stuName").oninput=e=>{state.name=e.target.value;save();$("#repText").value=reportText()};
+  $("#copyBtn").onclick=()=>{const ta=$("#repText");const txt=ta.value;
+    const done=()=>{$("#toast").textContent="Copied"};
+    try{navigator.clipboard.writeText(txt).then(done,()=>{ta.focus();ta.select();$("#toast").textContent="Selected. Press Ctrl+C or ⌘C to copy."})}catch(e){ta.focus();ta.select();$("#toast").textContent="Selected. Press Ctrl+C or ⌘C to copy."}};
+  $("#backBtn").onclick=()=>{state.view="case";save();render()};
+}
+
+function render(){renderHud();renderRooms();if(state.view==="report"&&totals().seen===CASES.length)renderReport();else{state.view="case";renderCase()}}
+
+$("#reportBtn").onclick=()=>{state.view="report";save();render();window.scrollTo({top:0})};
+$("#resetBtn").onclick=()=>{const b=$("#resetBtn");if(b.dataset.armed){state={cur:0,ans:{},name:state.name,view:"case"};save();b.textContent="Start a new shift";delete b.dataset.armed;render()}else{b.dataset.armed="1";b.textContent="Tap again to clear progress";setTimeout(()=>{if(b.dataset.armed){delete b.dataset.armed;b.textContent="Start a new shift"}},4000)}};
+
+function start(data){if(data&&data.ans)state=Object.assign(state,data);else load();render()}
+window.claude?.hot?.snapshot?.(()=>state);
+window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
+</script>
+
+</body></html>
